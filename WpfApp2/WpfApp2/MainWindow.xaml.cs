@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -22,85 +20,145 @@ namespace WpfApp2
     /// </summary>
     public partial class MainWindow : Window
     {
-        private ObservableCollection<Person> people;
+        public class Node
+        {
+            public string Name { get; set; }
+            public List<Node> Children { get; set; } = new List<Node>();
+
+            public override string ToString() => Name;
+        }
         public MainWindow()
         {
             InitializeComponent();
-
-            people = new ObservableCollection<Person>
+            LoadTree();
+        }
+        private void LoadTree()
+        {
+            var rootNodes = new List<Node>
             {
-                new Person { Name = "Иван", Age = 25, Email = "ivan@example.com" },
-                new Person { Name = "Мария", Age = 30, Email = "maria@example.com" },
-                new Person { Name = "Пётр", Age = 22, Email = "petr@example.com" }
+                new Node
+                {
+                    Name = "Фрукты",
+                    Children = new List<Node>
+                    {
+                        new Node { Name = "Яблоко" },
+                        new Node { Name = "Банан" },
+                        new Node
+                        {
+                            Name = "Цитрусовые",
+                            Children = new List<Node>
+                            {
+                                new Node { Name = "Апельсин" },
+                                new Node { Name = "Лимон" }
+                            }
+                        }
+                    }
+                },
+                new Node
+                {
+                    Name = "Овощи",
+                    Children = new List<Node>
+                    {
+                        new Node { Name = "Морковь" },
+                        new Node { Name = "Картофель" }
+                    }
+                }
             };
 
-            dataGrid.ItemsSource = people;
+            foreach (var node in rootNodes)
+            {
+                MyTreeView.Items.Add(CreateTreeViewItem(node));
+            }
         }
+
+        private TreeViewItem CreateTreeViewItem(Node node)
+        {
+            var item = new TreeViewItem { Header = node.Name, Tag = node };
+
+            foreach (var child in node.Children)
+            {
+                item.Items.Add(CreateTreeViewItem(child));
+            }
+
+            return item;
+        }
+
+        private void MyTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (MyTreeView.SelectedItem is TreeViewItem selectedItem)
+            {
+                var node = selectedItem.Tag as Node;
+                if (node != null && node.Children.Count > 0)
+                {
+                    selectedItem.IsExpanded = !selectedItem.IsExpanded;
+                }
+            }
+        }
+
         private void AddButton_Click(object sender, RoutedEventArgs e)
         {
-            var newPerson = new Person { Name = "Новый", Age = 0, Email = "email@example.com" };
-            people.Add(newPerson);
-            dataGrid.SelectedItem = newPerson;
-            dataGrid.ScrollIntoView(newPerson);
+            var newNodeName = "Новый элемент(я не знаю как изменить название)";
 
-            dataGrid.CurrentCell = new DataGridCellInfo(newPerson, dataGrid.Columns[0]);
-            dataGrid.BeginEdit();
-        }
-
-        private void EditButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (dataGrid.SelectedItem != null)
+            if (MyTreeView.SelectedItem is TreeViewItem selectedItem)
             {
-                dataGrid.BeginEdit();
+                var parentNode = selectedItem.Tag as Node;
+
+                if (parentNode != null)
+                {
+                    var newNode = new Node { Name = newNodeName };
+                    parentNode.Children.Add(newNode);
+
+                    var newTreeViewItem = CreateTreeViewItem(newNode);
+                    selectedItem.Items.Add(newTreeViewItem);
+                    selectedItem.IsExpanded = true;
+                }
             }
             else
             {
-                MessageBox.Show("Выберите строку для редактирования.");
+                var rootNode = new Node { Name = newNodeName };
+                MyTreeView.Items.Add(CreateTreeViewItem(rootNode));
             }
         }
 
         private void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            if (dataGrid.SelectedItem is Person selectedPerson)
+            if (MyTreeView.SelectedItem is TreeViewItem selectedItem)
             {
-                if (MessageBox.Show($"Удалить {selectedPerson.Name}?", "Подтверждение", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+                var parent = GetParent(selectedItem);
+
+                if (selectedItem.Tag is Node node)
                 {
-                    people.Remove(selectedPerson);
+                    if (parent != null)
+                    {
+                        if (parent.Tag is Node parentNode)
+                        {
+                            parentNode.Children.Remove(node);
+                        }
+                        parent.Items.Remove(selectedItem);
+                    }
+                    else
+                    {
+                        MyTreeView.Items.Remove(selectedItem);
+                    }
                 }
             }
             else
             {
-                MessageBox.Show("Выберите строку для удаления.");
+                MessageBox.Show("Выберите элемент для удаления", "Внимание");
             }
         }
-    }
-    public class Person : INotifyPropertyChanged
-    {
-        private string name;
-        private int age;
-        private string email;
 
-        public string Name
+
+        private TreeViewItem GetParent(TreeViewItem item)
         {
-            get => name;
-            set { name = value; OnPropertyChanged("Name"); }
+            DependencyObject parent = VisualTreeHelper.GetParent(item);
+
+            while (parent != null && !(parent is TreeViewItem))
+            {
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+
+            return parent as TreeViewItem;
         }
-
-        public int Age
-        {
-            get => age;
-            set { age = value; OnPropertyChanged("Age"); }
-        }
-
-        public string Email
-        {
-            get => email;
-            set { email = value; OnPropertyChanged("Email"); }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected void OnPropertyChanged(string propertyName) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

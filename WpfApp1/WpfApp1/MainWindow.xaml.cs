@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -21,23 +20,85 @@ namespace WpfApp1
     /// </summary>
     public partial class MainWindow : Window
     {
-        public ObservableCollection<Person> People { get; set; }
         public MainWindow()
         {
             InitializeComponent();
-            People = new ObservableCollection<Person>
+            LoadTree();
+        }
+        public class Node
+        {
+            public string Name { get; set; }
+            public List<Node> Children { get; set; } = new List<Node>();
+
+            public override string ToString()
             {
-                new Person { Name = "Иван", Age = 30 },
-                new Person { Name = "Мария", Age = 25 },
-                new Person { Name = "Петр", Age = 40 }
+                return Name;
+            }
+        }
+        private void LoadTree()
+        {
+            var rootNodes = new List<Node>
+            {
+                new Node
+                {
+                    Name = "Фрукты",
+                    Children = new List<Node>
+                    {
+                        new Node { Name = "Яблоко" },
+                        new Node { Name = "Банан" },
+                        new Node { Name = "Цитрусовые", Children = new List<Node>
+                            {
+                                new Node { Name = "Апельсин" },
+                                new Node { Name = "Лимон" }
+                            }
+                        }
+                    }
+                },
+                new Node
+                {
+                    Name = "Овощи",
+                    Children = new List<Node>
+                    {
+                        new Node { Name = "Морковь" },
+                        new Node { Name = "Картофель" }
+                    }
+                }
             };
 
-            DataContext = this;
+            foreach (var node in rootNodes)
+            {
+                MyTreeView.Items.Add(CreateTreeViewItem(node));
+            }
         }
-    }
-    public class Person
-    {
-        public string Name { get; set; }
-        public int Age { get; set; }
+        private TreeViewItem CreateTreeViewItem(Node node)
+        {
+            var item = new TreeViewItem { Header = node.Name, Tag = node };
+
+            foreach (var child in node.Children)
+            {
+                item.Items.Add(CreateTreeViewItem(child));
+            }
+
+            return item;
+        }
+        private void MyTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (MyTreeView.SelectedItem is TreeViewItem selectedItem)
+            {
+                var node = selectedItem.Tag as Node;
+
+                if (node != null)
+                {
+                    if (node.Children.Count > 0)
+                    {
+                        selectedItem.IsExpanded = !selectedItem.IsExpanded;
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Вы выбрали листовой узел: {node.Name}", "Информация");
+                    }
+                }
+            }
+        }
     }
 }
